@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: 225 20% 8%;
+    --card: 228 18% 13%;
+    --border: 228 14% 20%;
+    --text: 220 10% 90%;
+    --text-muted: 222 11% 60%;
+    --accent: 239 84% 67%;
+    --green: 142 71% 45%;
+    --red: 0 84% 60%;
+    --warning: 38 92% 50%;
+    --shadow: 0 8px 24px rgb(0 0 0 / 0.4);
+  }
+
+  .light {
+    --bg: 220 16% 96%;
+    --card: 0 0% 100%;
+    --border: 220 13% 90%;
+    --text: 228 18% 13%;
+    --text-muted: 222 10% 40%;
+    --accent: 238 83% 58%;
+    --green: 142 76% 36%;
+    --red: 0 72% 51%;
+    --warning: 30 90% 45%;
+    --shadow: 0 8px 24px rgb(0 0 0 / 0.08);
+  }
+
+  html,
+  body {
+    background: hsl(var(--bg));
+    color: hsl(var(--text));
+    min-height: 100vh;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  * {
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-card border border-border rounded-lg;
+  }
+
+  .pill {
+    @apply inline-block px-2 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  .pill-positive {
+    @apply bg-green/15 text-green;
+  }
+
+  .pill-negative {
+    @apply bg-red/15 text-red;
+  }
+
+  .pill-neutral {
+    @apply bg-text-muted/15 text-text-muted;
+  }
+
+  .section-title {
+    @apply text-lg font-bold text-text mb-4;
+  }
+}
