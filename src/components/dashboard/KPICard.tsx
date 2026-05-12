@@ -6,25 +6,27 @@ interface Props {
   value: number | null;
   change: number | null;
   variant?: 'reach' | 'audience' | 'engagement' | 'interactions' | 'default';
+  suffix?: string;
 }
 
-const VARIANT_BG = {
-  reach: 'bg-gradient-to-br from-indigo-500 to-purple-500',
-  audience: 'bg-gradient-to-br from-green-500 to-green-600',
-  engagement: 'bg-gradient-to-br from-amber-500 to-amber-600',
-  interactions: 'bg-gradient-to-br from-pink-500 to-pink-600',
-  default: 'bg-card border border-border',
-};
-
-export function KPICard({ label, value, change, variant = 'default' }: Props) {
+export function KPICard({ label, value, change, variant = 'default', suffix }: Props) {
   const isHero = variant !== 'default';
+
+  // Inline styles for hero cards (avoids Tailwind purge issues with dynamic gradient classes)
+  const heroStyles: Record<string, React.CSSProperties> = {
+    reach: { background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' },
+    audience: { background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' },
+    engagement: { background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' },
+    interactions: { background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)' },
+  };
+
   return (
     <div
       className={cn(
         'rounded-lg p-6 transition',
-        VARIANT_BG[variant],
-        isHero ? 'text-white text-center' : ''
+        isHero ? 'text-white text-center' : 'bg-card border border-border'
       )}
+      style={isHero ? heroStyles[variant] : undefined}
     >
       <div
         className={cn(
@@ -35,7 +37,7 @@ export function KPICard({ label, value, change, variant = 'default' }: Props) {
         {label}
       </div>
       <div className={cn('font-extrabold mb-1', isHero ? 'text-3xl' : 'text-2xl')}>
-        {formatNum(value)}
+        {formatNum(value)}{suffix || ''}
       </div>
       {change != null && (
         <div

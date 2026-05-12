@@ -29,7 +29,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Reco
           <KPICard label="Total Reach" value={metrics.reach.value} change={metrics.reach.change} variant="reach" />
           <KPICard label="Total Audience" value={metrics.audience.value} change={metrics.audience.change} variant="audience" />
           <KPICard label="Total Interactions" value={metrics.interactions.value} change={metrics.interactions.change} variant="interactions" />
-          <KPICard label="Avg Engagement" value={Number(twEng.toFixed(1))} change={engCh} variant="engagement" />
+          <KPICard label="Engagement Rate" value={Number(twEng.toFixed(1))} change={engCh} variant="engagement" suffix="%" />
         </div>
       </section>
       <section>
