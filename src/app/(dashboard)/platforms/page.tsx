@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { loadKpiSnapshots } from '@/lib/kpi/load';
 import { PLATFORM_META, type Period, type Platform } from '@/lib/kpi/types';
 import { formatNum, formatPct, pctChange, pctChangeClass } from '@/lib/kpi/format';

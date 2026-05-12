@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { loadKpiSnapshots } from '@/lib/kpi/load';
 import { summaryMetrics } from '@/lib/kpi/aggregate';
 import { generateInsights } from '@/lib/kpi/insights';

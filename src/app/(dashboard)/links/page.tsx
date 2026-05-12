@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { loadPlatformAccounts } from '@/lib/kpi/load';
 import { PLATFORM_META } from '@/lib/kpi/types';
 
