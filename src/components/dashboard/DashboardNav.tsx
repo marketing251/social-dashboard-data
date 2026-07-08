@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './ThemeToggle';
 import { GrowthToggle } from './GrowthToggle';
+
+export type AsOfByPeriod = { weekly?: string; monthly?: string; quarterly?: string };
 
 const TABS = [
   { href: '/dashboard', label: 'Summary', match: /^\/dashboard\/?$/ },
@@ -14,9 +16,12 @@ const TABS = [
   { href: '/dashboard/links', label: 'Links', match: /^\/dashboard\/links/ },
 ];
 
-export function DashboardNav({ asOf }: { asOf?: string }) {
+export function DashboardNav({ asOf }: { asOf?: AsOfByPeriod }) {
   const pathname = usePathname();
+  const params = useSearchParams();
   const hideGrowth = pathname.includes('/competitors') || pathname.includes('/content') || pathname.includes('/links');
+  const period = (params.get('period') || 'weekly') as keyof AsOfByPeriod;
+  const asOfLabel = asOf?.[period] ?? asOf?.weekly;
 
   return (
     <header className="bg-card border-b border-border px-8 py-5 flex items-center justify-between flex-wrap gap-4">
@@ -24,9 +29,9 @@ export function DashboardNav({ asOf }: { asOf?: string }) {
         <span className="text-accent">PropAccount</span> Social Dashboard
       </h1>
 
-      {asOf && (
+      {asOfLabel && (
         <div className="text-sm text-text-muted bg-bg border border-border rounded-sm px-4 py-1.5">
-          as of <strong className="text-text">{asOf}</strong>
+          as of <strong className="text-text">{asOfLabel}</strong>
         </div>
       )}
 
