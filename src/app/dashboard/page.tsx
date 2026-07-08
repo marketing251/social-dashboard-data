@@ -7,8 +7,9 @@ import { KPICard } from '@/components/dashboard/KPICard';
 import { InsightCard } from '@/components/dashboard/InsightCard';
 import { formatNum, formatPct, pctChangeClass, pctChange } from '@/lib/kpi/format';
 
-export default async function SummaryPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
-  const period = (typeof searchParams.period === 'string' ? searchParams.period : 'weekly') as Period;
+export default async function SummaryPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams;
+  const period = (typeof sp.period === 'string' ? sp.period : 'weekly') as Period;
   const { rows } = await loadKpiSnapshots(period);
   if (rows.length === 0) {
     return <div className="card p-10 text-center"><h2 className="text-xl font-bold mb-2">No data yet</h2><p className="text-text-muted text-sm">Run the backfill SQL in Supabase to load historical data.</p></div>;

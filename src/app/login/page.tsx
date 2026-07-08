@@ -1,7 +1,8 @@
 import { login } from './actions';
-export default function LoginPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
-  const error = typeof searchParams.error === 'string' ? searchParams.error : undefined;
-  const next = typeof searchParams.next === 'string' ? searchParams.next : '';
+export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams;
+  const error = typeof sp.error === 'string' ? sp.error : undefined;
+  const next = typeof sp.next === 'string' ? sp.next : '';
   return (
     <main className="min-h-screen flex items-center justify-center p-4">
       <form action={login} className="card p-10 w-full max-w-sm flex flex-col gap-3">

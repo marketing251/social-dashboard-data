@@ -3,9 +3,10 @@ import { loadKpiSnapshots } from '@/lib/kpi/load';
 import { PLATFORM_META, type Period, type Platform } from '@/lib/kpi/types';
 import { formatNum, formatPct, pctChange, pctChangeClass } from '@/lib/kpi/format';
 
-export default async function PlatformsPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
-  const period = (typeof searchParams.period === 'string' ? searchParams.period : 'weekly') as Period;
-  const selected = (typeof searchParams.platform === 'string' ? searchParams.platform : 'twitter') as Platform;
+export default async function PlatformsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams;
+  const period = (typeof sp.period === 'string' ? sp.period : 'weekly') as Period;
+  const selected = (typeof sp.platform === 'string' ? sp.platform : 'twitter') as Platform;
   const { rows } = await loadKpiSnapshots(period);
   if (rows.length === 0) return <div className="card p-10 text-center text-text-muted">No data.</div>;
   const platforms = Object.keys(PLATFORM_META) as Platform[];
