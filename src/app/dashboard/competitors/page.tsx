@@ -5,7 +5,6 @@ import {
   loadKpiSnapshots,
 } from '@/lib/kpi/load';
 import { formatNum } from '@/lib/kpi/format';
-import { StackedBarChart } from '@/components/dashboard/StackedBarChart';
 
 export default async function CompetitorsPage() {
   const [competitors, snapshots, { rows }] = await Promise.all([
@@ -104,27 +103,9 @@ export default async function CompetitorsPage() {
       <section>
         <h2 className="section-title">Follower Comparison</h2>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <ChartCard title="Instagram">
-            <StackedBarChart
-              horizontal
-              stacked={false}
-              series={[{ label: 'Instagram', color: '#e1306c', data: chartData('ig') }]}
-            />
-          </ChartCard>
-          <ChartCard title="X / Twitter">
-            <StackedBarChart
-              horizontal
-              stacked={false}
-              series={[{ label: 'X', color: '#1da1f2', data: chartData('tw') }]}
-            />
-          </ChartCard>
-          <ChartCard title="YouTube">
-            <StackedBarChart
-              horizontal
-              stacked={false}
-              series={[{ label: 'YouTube', color: '#ff0000', data: chartData('yt') }]}
-            />
-          </ChartCard>
+          <BarListCard title="Instagram" color="#e1306c" data={chartData('ig')} />
+          <BarListCard title="X / Twitter" color="#1da1f2" data={chartData('tw')} />
+          <BarListCard title="YouTube" color="#ff0000" data={chartData('yt')} />
         </div>
       </section>
 
@@ -171,11 +152,28 @@ function MetricCell({ label, value }: { label: string; value: number | null }) {
   );
 }
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+function BarListCard({ title, color, data }: { title: string; color: string; data: Array<{ x: string; y: number }> }) {
+  const max = Math.max(1, ...data.map((d) => d.y));
   return (
     <div className="card p-5">
-      <h3 className="font-semibold mb-3">{title}</h3>
-      {children}
+      <h3 className="font-semibold mb-4">{title}</h3>
+      {data.length === 0 ? (
+        <p className="text-sm text-text-muted">No data.</p>
+      ) : (
+        <div className="space-y-3">
+          {data.map((d) => (
+            <div key={d.x}>
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-text-muted truncate pr-2">{d.x}</span>
+                <span className="font-bold shrink-0">{formatNum(d.y)}</span>
+              </div>
+              <div className="h-2.5 bg-bg rounded-full overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${(d.y / max) * 100}%`, background: color }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
