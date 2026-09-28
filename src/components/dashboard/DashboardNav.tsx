@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { ThemeToggle } from './ThemeToggle';
 import { GrowthToggle } from './GrowthToggle';
 import { PrintButton } from './PrintButton';
+import { Logo } from './Logo';
 import type { SheetSyncStatus } from '@/lib/kpi/load';
 
 export type AsOfByPeriod = { weekly?: string; monthly?: string; quarterly?: string };
@@ -52,8 +53,9 @@ export function DashboardNav({ asOf, sync = null }: { asOf?: AsOfByPeriod; sync?
 
   return (
     <header className="bg-card border-b border-border px-4 sm:px-8 py-5 flex items-center justify-between flex-wrap gap-4">
-      <h1 className="text-xl font-bold flex items-center gap-2">
-        <span className="text-accent">PropAccount</span> Social Dashboard
+      <h1 className="text-xl font-bold flex items-center gap-3">
+        <Logo className="h-7 w-auto text-text shrink-0" />
+        <span className="text-text-muted font-semibold whitespace-nowrap">Social Dashboard</span>
       </h1>
 
       {asOfLabel && (
