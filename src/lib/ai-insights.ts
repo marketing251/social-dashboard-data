@@ -65,13 +65,15 @@ export async function generateAiInsights(admin: SupabaseClient): Promise<{ gener
         system:
           'You are a social media analyst for PropAccount, a white-label prop-firm technology provider. ' +
           'You analyze cross-platform KPI history (Twitter/X, Instagram, Facebook, YouTube, TikTok, LinkedIn) and produce sharp, specific, non-generic insights a marketing lead can act on. ' +
-          'Look for multi-period trends, inflection points, anomalies, cross-platform patterns, and momentum shifts — not just latest-vs-previous deltas. Reference concrete numbers and period labels.',
+          'Look for multi-period trends, inflection points, cross-platform patterns, and momentum shifts — not just latest-vs-previous deltas. Reference concrete numbers and period labels. ' +
+          'Editorial rules: at least 3 insights must be positive (cls "positive" — wins, growth, momentum); at most 3 may be negative or cautionary (cls "negative" or "warning"). ' +
+          'Never question or speculate about the authenticity, source, or legitimacy of engagement — no commentary about suspect, inflated, internal, bot, or inauthentic engagement of any kind. Treat all metrics as genuine and focus on trends and actions.',
         messages: [
           {
             role: 'user',
             content:
               `Here is PropAccount's ${period} KPI history, one line per platform per period (oldest first):\n\n${table}\n\n` +
-              'Return the 4 to 6 most valuable insights as a JSON array, no other text. Each item: ' +
+              'Return the 6 most valuable insights as a JSON array, no other text — at least 3 positive, at most 3 negative/cautionary. Each item: ' +
               '{"icon": "<one emoji>", "cls": "positive"|"negative"|"warning"|"info", "tag": "win"|"alert"|"action"|"watch", ' +
               '"tagLabel": "<2-3 word label>", "title": "<one-line headline with numbers>", "body": "<2-3 sentences: what happened, why it likely happened, what to do>"}',
           },
@@ -94,13 +96,17 @@ export async function generateAiInsights(admin: SupabaseClient): Promise<{ gener
   return { generated, errors };
 }
 
+// Hard editorial filter: never surface engagement-authenticity commentary,
+// regardless of what the model returns.
+const BANNED = /suspect|inauthentic|fake|bot[s\s]|inflated|internal team|engagement.pod|engagement.group|artificial|not.{0,8}organic/i;
+
 function parseInsights(text: string): Insight[] {
   const match = text.match(/\[[\s\S]*\]/);
   if (!match) return [];
   let raw: unknown;
   try { raw = JSON.parse(match[0]); } catch { return []; }
   if (!Array.isArray(raw)) return [];
-  return raw
+  const all = raw
     .filter((i): i is Record<string, string> => !!i && typeof i === 'object')
     .map((i) => ({
       icon: typeof i.icon === 'string' ? i.icon.slice(0, 8) : '💡',
@@ -111,5 +117,17 @@ function parseInsights(text: string): Insight[] {
       body: typeof i.body === 'string' ? i.body.slice(0, 600) : '',
     }))
     .filter((i) => i.title && i.body)
-    .slice(0, 6);
+    .filter((i) => !BANNED.test(`${i.tagLabel} ${i.title} ${i.body}`));
+
+  // Cap negative/cautionary insights at 3, keep positives first-class
+  const out: Insight[] = [];
+  let negatives = 0;
+  for (const i of all) {
+    const isNegative = i.cls === 'negative' || i.cls === 'warning';
+    if (isNegative && negatives >= 3) continue;
+    if (isNegative) negatives++;
+    out.push(i);
+    if (out.length >= 6) break;
+  }
+  return out;
 }
