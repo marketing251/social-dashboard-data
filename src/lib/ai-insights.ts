@@ -97,8 +97,28 @@ export async function generateAiInsights(admin: SupabaseClient): Promise<{ gener
 }
 
 // Hard editorial filter: never surface engagement-authenticity commentary,
-// regardless of what the model returns.
-const BANNED = /suspect|inauthentic|fake|bot[s\s]|inflated|internal team|engagement.pod|engagement.group|artificial|not.{0,8}organic/i;
+// regardless of what the model returns or what is stored in the database.
+const BANNED = /suspect|inauthentic|fake|bot[s\s]|inflated|internal team|internal sharing|who is doing the shar|engagement.pod|engagement.group|artificial|not.{0,8}organic/i;
+
+/**
+ * Editorial rules applied to any insight list (fresh from the model or read
+ * back from ai_insights): drop engagement-authenticity commentary, cap
+ * negative/cautionary items at 3, max 6 total.
+ */
+export function sanitizeInsights(list: Insight[]): Insight[] {
+  const out: Insight[] = [];
+  let negatives = 0;
+  for (const i of list) {
+    if (!i?.title || !i?.body) continue;
+    if (BANNED.test(`${i.tagLabel} ${i.title} ${i.body}`)) continue;
+    const isNegative = i.cls === 'negative' || i.cls === 'warning';
+    if (isNegative && negatives >= 3) continue;
+    if (isNegative) negatives++;
+    out.push(i);
+    if (out.length >= 6) break;
+  }
+  return out;
+}
 
 function parseInsights(text: string): Insight[] {
   const match = text.match(/\[[\s\S]*\]/);
@@ -115,19 +135,6 @@ function parseInsights(text: string): Insight[] {
       tagLabel: typeof i.tagLabel === 'string' ? i.tagLabel.slice(0, 40) : 'Insight',
       title: typeof i.title === 'string' ? i.title.slice(0, 200) : '',
       body: typeof i.body === 'string' ? i.body.slice(0, 600) : '',
-    }))
-    .filter((i) => i.title && i.body)
-    .filter((i) => !BANNED.test(`${i.tagLabel} ${i.title} ${i.body}`));
-
-  // Cap negative/cautionary insights at 3, keep positives first-class
-  const out: Insight[] = [];
-  let negatives = 0;
-  for (const i of all) {
-    const isNegative = i.cls === 'negative' || i.cls === 'warning';
-    if (isNegative && negatives >= 3) continue;
-    if (isNegative) negatives++;
-    out.push(i);
-    if (out.length >= 6) break;
-  }
-  return out;
+    }));
+  return sanitizeInsights(all);
 }

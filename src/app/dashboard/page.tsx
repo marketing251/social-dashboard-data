@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { loadKpiSnapshots, loadAiInsights } from '@/lib/kpi/load';
 import { summaryMetrics } from '@/lib/kpi/aggregate';
 import { generateInsights, type Insight } from '@/lib/kpi/insights';
+import { sanitizeInsights } from '@/lib/ai-insights';
 import { PLATFORM_META, PLATFORMS, type Period, type Platform } from '@/lib/kpi/types';
 import { KPICard } from '@/components/dashboard/KPICard';
 import { InsightCard } from '@/components/dashboard/InsightCard';
@@ -17,7 +18,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
   }
   const metrics = summaryMetrics(rows);
   const ruleInsights = generateInsights(rows, period);
-  const aiInsights = (ai?.insights ?? []) as Insight[];
+  const aiInsights = sanitizeInsights((ai?.insights ?? []) as Insight[]);
   const insights = aiInsights.length > 0 ? aiInsights : ruleInsights;
   const aiGeneratedAt = aiInsights.length > 0 && ai?.generated_at
     ? new Date(ai.generated_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
