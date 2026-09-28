@@ -71,3 +71,27 @@
     @apply text-lg font-bold text-text mb-4;
   }
 }
+
+/* Print / "Export PDF": force light theme, hide interactive chrome */
+@media print {
+  :root {
+    --bg: 0 0% 100%;
+    --card: 0 0% 100%;
+    --border: 220 13% 85%;
+    --text: 228 18% 13%;
+    --text-muted: 222 10% 40%;
+    --accent: 238 83% 58%;
+    --green: 142 76% 30%;
+    --red: 0 72% 45%;
+    --warning: 30 90% 40%;
+    --shadow: none;
+  }
+  nav,
+  button,
+  .no-print {
+    display: none !important;
+  }
+  .card {
+    break-inside: avoid;
+  }
+}

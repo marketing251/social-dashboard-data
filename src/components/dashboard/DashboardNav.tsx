@@ -5,8 +5,35 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './ThemeToggle';
 import { GrowthToggle } from './GrowthToggle';
+import { PrintButton } from './PrintButton';
+import type { SheetSyncStatus } from '@/lib/kpi/load';
 
 export type AsOfByPeriod = { weekly?: string; monthly?: string; quarterly?: string };
+
+function relativeTime(iso: string): string {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60 * 24) return `${Math.round(mins / 60)}h ago`;
+  return `${Math.round(mins / (60 * 24))}d ago`;
+}
+
+function SyncChip({ sync }: { sync: SheetSyncStatus | null }) {
+  if (!sync) return null;
+  const ok = sync.status === 'success';
+  return (
+    <div
+      className="no-print flex items-center gap-1.5 text-xs text-text-muted"
+      title={ok
+        ? `Last sheet sync: ${sync.rows_inserted ?? 0} rows`
+        : `Sheet sync failed: ${sync.error_message ?? 'unknown error'}`}
+    >
+      <span className={cn('w-2 h-2 rounded-full', ok ? 'bg-green' : 'bg-red')} />
+      <span suppressHydrationWarning>
+        {ok ? 'Synced' : 'Sync failed'}{sync.finished_at ? ` ${relativeTime(sync.finished_at)}` : ''}
+      </span>
+    </div>
+  );
+}
 
 const TABS = [
   { href: '/dashboard', label: 'Summary', match: /^\/dashboard\/?$/ },
@@ -16,7 +43,7 @@ const TABS = [
   { href: '/dashboard/links', label: 'Links', match: /^\/dashboard\/links/ },
 ];
 
-export function DashboardNav({ asOf }: { asOf?: AsOfByPeriod }) {
+export function DashboardNav({ asOf, sync = null }: { asOf?: AsOfByPeriod; sync?: SheetSyncStatus | null }) {
   const pathname = usePathname();
   const params = useSearchParams();
   const hideGrowth = pathname.includes('/competitors') || pathname.includes('/content') || pathname.includes('/links');
@@ -36,6 +63,8 @@ export function DashboardNav({ asOf }: { asOf?: AsOfByPeriod }) {
       )}
 
       <div className="flex items-center gap-3 flex-wrap">
+        <SyncChip sync={sync} />
+        <PrintButton />
         <ThemeToggle />
         {!hideGrowth && <GrowthToggle />}
       </div>

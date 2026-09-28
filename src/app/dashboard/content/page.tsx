@@ -5,7 +5,6 @@ import {
   loadContentTopics,
 } from '@/lib/kpi/load';
 import { formatNum } from '@/lib/kpi/format';
-import { StackedBarChart } from '@/components/dashboard/StackedBarChart';
 import type { ContentType } from '@/lib/kpi/types';
 
 const CONTENT_LABELS: Record<ContentType, string> = {
@@ -64,14 +63,7 @@ export default async function ContentPage() {
     }))
     .sort((a, b) => b.value - a.value);
 
-  // Topics chart
-  const topicSeries = [
-    {
-      label: 'Avg Engagement',
-      color: '#6366f1',
-      data: topics.map((t) => ({ x: t.topic, y: t.avg_engagement })),
-    },
-  ];
+  const maxTopicEng = Math.max(1, ...topics.map((t) => t.avg_engagement ?? 0));
 
   return (
     <div className="space-y-8">
@@ -137,7 +129,25 @@ export default async function ContentPage() {
       <section>
         <h2 className="section-title">Top Content Topics by Engagement</h2>
         <div className="card p-6">
-          <StackedBarChart horizontal stacked={false} series={topicSeries} height={340} />
+          {topics.length === 0 ? (
+            <p className="text-sm text-text-muted">No topic data yet — run the content benchmarks SQL in Supabase.</p>
+          ) : (
+            <div className="space-y-3">
+              {topics.map((t) => (
+                <div key={t.topic} className="flex items-center gap-3">
+                  <div className="w-36 sm:w-44 shrink-0 text-sm text-right text-text-muted">{t.topic}</div>
+                  <div className="flex-1 h-6 bg-bg rounded-sm overflow-hidden">
+                    <div
+                      className="h-full rounded-sm"
+                      style={{ width: `${((t.avg_engagement ?? 0) / maxTopicEng) * 100}%`, background: t.color ?? '#6366f1' }}
+                    />
+                  </div>
+                  <div className="w-10 shrink-0 text-sm font-bold">{formatNum(t.avg_engagement ?? 0)}</div>
+                </div>
+              ))}
+              <p className="text-xs text-text-muted pt-2">Average engagement per post, last 30 days of posts.</p>
+            </div>
+          )}
         </div>
       </section>
     </div>

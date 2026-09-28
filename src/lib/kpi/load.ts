@@ -34,3 +34,23 @@ export async function loadContentTopics(): Promise<ContentTopic[]> {
   const { data } = await (await createClient()).from('content_topics').select('*').order('display_order', { ascending: true });
   return (data ?? []) as ContentTopic[];
 }
+export interface SheetSyncStatus { status: 'success' | 'partial' | 'failed'; finished_at: string | null; rows_inserted: number | null; error_message: string | null }
+/** Latest Google Sheet sync run (sync_logs rows with account_id null). */
+export async function loadLatestSheetSync(): Promise<SheetSyncStatus | null> {
+  const { data } = await (await createClient())
+    .from('sync_logs')
+    .select('status, finished_at, rows_inserted, error_message')
+    .is('account_id', null)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as SheetSyncStatus) ?? null;
+}
+export async function loadAiInsights(period: Period): Promise<{ insights: unknown[]; generated_at: string } | null> {
+  const { data } = await (await createClient())
+    .from('ai_insights')
+    .select('insights, generated_at')
+    .eq('period', period)
+    .maybeSingle();
+  return (data as { insights: unknown[]; generated_at: string }) ?? null;
+}

@@ -95,5 +95,64 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ran: results.length, results });
+  // Auto-capture competitor YouTube subscriber counts (public API, free quota).
+  // Non-self competitors with a youtube_url get a weekly snapshot row.
+  const ytKey = process.env.YOUTUBE_API_KEY;
+  let competitorYt: unknown = { skipped: 'YOUTUBE_API_KEY not configured' };
+  if (ytKey) {
+    const outcomes: Array<{ name: string; subscribers?: number; error?: string }> = [];
+    const { data: comps } = await supabase
+      .from('competitors')
+      .select('id, name, youtube_url')
+      .eq('is_self', false)
+      .not('youtube_url', 'is', null);
+    const today = new Date().toISOString().slice(0, 10);
+    for (const comp of comps ?? []) {
+      try {
+        const url = String(comp.youtube_url);
+        const channelMatch = url.match(/\/channel\/([\w-]+)/);
+        const handleMatch = url.match(/\/@([\w.-]+)/);
+        const query = channelMatch
+          ? `id=${channelMatch[1]}`
+          : handleMatch
+            ? `forHandle=@${handleMatch[1]}`
+            : null;
+        if (!query) { outcomes.push({ name: comp.name, error: 'unrecognized youtube_url' }); continue; }
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=statistics&${query}&key=${ytKey}`);
+        const json = await res.json();
+        const subs = Number(json?.items?.[0]?.statistics?.subscriberCount);
+        if (!Number.isFinite(subs)) { outcomes.push({ name: comp.name, error: 'channel not found' }); continue; }
+        // Carry the other platforms forward from the newest snapshot so this
+        // row doesn't blank them out as the competitor's "latest" numbers
+        const { data: prior } = await supabase
+          .from('competitor_snapshots')
+          .select('snapshot_date, instagram_followers, twitter_followers, facebook_followers, tiktok_followers, linkedin_followers')
+          .eq('competitor_id', comp.id)
+          .order('snapshot_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        await supabase.from('competitor_snapshots').upsert(
+          {
+            competitor_id: comp.id,
+            snapshot_date: today,
+            youtube_subscribers: subs,
+            instagram_followers: prior?.instagram_followers ?? null,
+            twitter_followers: prior?.twitter_followers ?? null,
+            facebook_followers: prior?.facebook_followers ?? null,
+            tiktok_followers: prior?.tiktok_followers ?? null,
+            linkedin_followers: prior?.linkedin_followers ?? null,
+            notes: `YouTube auto-captured; other platforms carried from ${prior?.snapshot_date ?? 'n/a'}`,
+            source: 'youtube_api_auto',
+          },
+          { onConflict: 'competitor_id,snapshot_date' }
+        );
+        outcomes.push({ name: comp.name, subscribers: subs });
+      } catch (err) {
+        outcomes.push({ name: comp.name, error: err instanceof Error ? err.message : 'unknown' });
+      }
+    }
+    competitorYt = outcomes;
+  }
+
+  return NextResponse.json({ ran: results.length, results, competitorYt });
 }
