@@ -3,11 +3,9 @@ import { loadKpiSnapshots, loadAiInsights } from '@/lib/kpi/load';
 import { summaryMetrics } from '@/lib/kpi/aggregate';
 import { generateInsights, type Insight } from '@/lib/kpi/insights';
 import { sanitizeInsights } from '@/lib/ai-insights';
-import { PLATFORM_META, PLATFORMS, type Period, type Platform } from '@/lib/kpi/types';
-import { KPICard } from '@/components/dashboard/KPICard';
-import { InsightCard } from '@/components/dashboard/InsightCard';
-import { TrendLineChart } from '@/components/dashboard/TrendLineChart';
-import { formatNum, formatPct, pctChangeClass, pctChange } from '@/lib/kpi/format';
+import { PLATFORM_META, PLATFORMS, type Period } from '@/lib/kpi/types';
+import { SummaryView } from '@/components/dashboard/SummaryView';
+import { pctChange } from '@/lib/kpi/format';
 
 export default async function SummaryPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
@@ -35,64 +33,16 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
   const engCh = twEngPrev ? pctChange(twEng, twEngPrev) : null;
 
   return (
-    <div className="space-y-8">
-      <section>
-        <h2 className="section-title">Aggregated KPIs (All Platforms)</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KPICard label="Total Reach" value={metrics.reach.value} change={metrics.reach.change} variant="reach" />
-          <KPICard label="Total Audience" value={metrics.audience.value} change={metrics.audience.change} variant="audience" />
-          <KPICard label="Total Interactions" value={metrics.interactions.value} change={metrics.interactions.change} variant="interactions" />
-          <KPICard label="Engagement Rate" value={Number(twEng.toFixed(1))} change={engCh} variant="engagement" suffix="%" />
-        </div>
-      </section>
-      {rows.length >= 3 && (
-        <section>
-          <h2 className="section-title">Audience Growth</h2>
-          <div className="card p-6">
-            <TrendLineChart series={trendSeries} height={320} />
-          </div>
-        </section>
-      )}
-      <section>
-        <h2 className="section-title">Platform Overview</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
-          {(Object.entries(PLATFORM_META) as [Platform, (typeof PLATFORM_META)[Platform]][]).map(([p, meta]) => {
-            const snap = latest.byPlatform[p]; const prevSnap = prev?.byPlatform[p];
-            if (!snap) return null;
-            return (
-              <div key={p} className="card p-6">
-                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
-                  <span className="w-3 h-3 rounded-full" style={{ background: meta.color }} />
-                  <h3 className="font-bold">{meta.label}</h3>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {(['followers','impressions','views','likes','comments'] as const).map(m => {
-                    const v = snap[m]; if (v == null) return null;
-                    const pv = prevSnap?.[m];
-                    const ch = typeof pv === 'number' && pv !== 0 ? ((v - pv) / pv) * 100 : null;
-                    return (<div key={m} className="bg-bg rounded-sm p-3">
-                      <div className="text-[10px] uppercase tracking-wide text-text-muted mb-1">{m}</div>
-                      <div className="text-lg font-bold">{formatNum(v)}</div>
-                      {ch != null && <div className={pctChangeClass(ch) === 'positive' ? 'text-green text-xs font-semibold' : pctChangeClass(ch) === 'negative' ? 'text-red text-xs font-semibold' : 'text-text-muted text-xs font-semibold'}>{formatPct(ch)}</div>}
-                    </div>);
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-      {insights.length > 0 && (
-        <section>
-          <h2 className="section-title">
-            Key Insights
-            {aiGeneratedAt && <span className="ml-2 text-xs font-normal text-text-muted">AI-generated {aiGeneratedAt}</span>}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {insights.map((ins, i) => <InsightCard key={i} insight={ins} />)}
-          </div>
-        </section>
-      )}
-    </div>
+    <SummaryView
+      metrics={metrics}
+      engagementRate={twEng}
+      engagementChange={engCh}
+      trendSeries={trendSeries}
+      latest={latest}
+      prev={prev}
+      rowCount={rows.length}
+      insights={insights}
+      aiGeneratedAt={aiGeneratedAt}
+    />
   );
 }

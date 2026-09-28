@@ -23,7 +23,7 @@ export function KPICard({ label, value, change, variant = 'default', suffix }: P
   return (
     <div
       className={cn(
-        'rounded-lg p-6 transition',
+        'rounded-lg p-6 transition print:p-4 print:break-inside-avoid',
         isHero ? 'text-white text-center' : 'bg-card border border-border'
       )}
       style={isHero ? heroStyles[variant] : undefined}
@@ -36,7 +36,7 @@ export function KPICard({ label, value, change, variant = 'default', suffix }: P
       >
         {label}
       </div>
-      <div className={cn('font-extrabold mb-1', isHero ? 'text-3xl' : 'text-2xl')}>
+      <div className={cn('font-extrabold mb-1', isHero ? 'text-3xl print:text-2xl' : 'text-2xl')}>
         {formatNum(value)}{suffix || ''}
       </div>
       {change != null && (

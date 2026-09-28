@@ -72,19 +72,49 @@
   }
 }
 
-/* Print / "Export PDF": force light theme, hide interactive chrome */
+/* Print / "Export PDF": light report layout, branded footer, no browser chrome */
+@page {
+  size: letter;
+  margin: 0.5in 0.5in 0.6in;
+  /* Defining margin boxes replaces the browser's date/URL header and footer */
+  @top-left { content: ''; }
+  @bottom-left {
+    content: 'PropAccount  ·  Social Media Performance Report';
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 8pt;
+    color: #8a8f9c;
+  }
+  @bottom-right {
+    content: 'Page ' counter(page) ' of ' counter(pages);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 8pt;
+    color: #8a8f9c;
+  }
+}
+
 @media print {
-  :root {
-    --bg: 0 0% 100%;
+  :root,
+  .light {
+    --bg: 220 16% 96%;
     --card: 0 0% 100%;
-    --border: 220 13% 85%;
+    --border: 220 13% 87%;
     --text: 228 18% 13%;
-    --text-muted: 222 10% 40%;
+    --text-muted: 222 10% 42%;
     --accent: 238 83% 58%;
-    --green: 142 76% 30%;
-    --red: 0 72% 45%;
-    --warning: 30 90% 40%;
+    --green: 142 76% 32%;
+    --red: 0 72% 47%;
+    --warning: 30 90% 42%;
     --shadow: none;
+  }
+  html,
+  body {
+    background: #fff !important;
+    min-height: 0 !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    transition: none !important;
   }
   nav,
   button,
@@ -93,5 +123,11 @@
   }
   .card {
     break-inside: avoid;
+    box-shadow: none !important;
+  }
+  .section-title {
+    font-size: 13px;
+    margin-bottom: 0.5rem;
+    break-after: avoid;
   }
 }

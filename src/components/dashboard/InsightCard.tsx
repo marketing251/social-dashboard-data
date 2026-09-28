@@ -17,18 +17,18 @@ const TAG_STYLE = {
 
 export function InsightCard({ insight }: { insight: Insight }) {
   return (
-    <div className="card p-5 flex gap-4 items-start">
+    <div className="card p-5 flex gap-4 items-start print:p-3 print:gap-3">
       <div
         className={cn(
-          'w-10 h-10 rounded-md flex items-center justify-center text-xl flex-shrink-0',
+          'w-10 h-10 rounded-md flex items-center justify-center text-xl flex-shrink-0 print:w-8 print:h-8 print:text-base',
           CLS_BG[insight.cls]
         )}
       >
         {insight.icon}
       </div>
       <div className="flex-1">
-        <h4 className="text-sm font-bold text-text mb-1">{insight.title}</h4>
-        <p className="text-xs text-text-muted leading-relaxed">{insight.body}</p>
+        <h4 className="text-sm font-bold text-text mb-1 print:text-[11px] print:leading-snug">{insight.title}</h4>
+        <p className="text-xs text-text-muted leading-relaxed print:text-[9.5px] print:leading-normal">{insight.body}</p>
         <span
           className={cn(
             'inline-block mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold',

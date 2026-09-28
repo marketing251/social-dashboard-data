@@ -18,5 +18,5 @@ export default async function DashboardLayout({ children }: { children: React.Re
     monthly: monthly ? `${monthly.period_label} ${monthly.period_end.slice(0, 4)}` : undefined,
     quarterly: quarterly ? `${quarterly.period_label} (${fmtDate(quarterly.period_start)} – ${fmtDate(quarterly.period_end)})` : undefined,
   };
-  return (<div className="min-h-screen"><DashboardNav asOf={asOf} sync={sync} /><main className="px-4 sm:px-8 py-6 max-w-[1440px] mx-auto">{children}</main></div>);
+  return (<div className="min-h-screen"><DashboardNav asOf={asOf} sync={sync} /><main className="px-4 sm:px-8 py-6 max-w-[1440px] mx-auto print:p-0 print:max-w-none">{children}</main></div>);
 }
