@@ -9,4 +9,5 @@ node_modules
 .turbo
 coverage
 next-env.d.ts
+tsconfig.tsbuildinfo
 *.tsbuildinfo

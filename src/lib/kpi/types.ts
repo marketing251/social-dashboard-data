@@ -80,6 +80,7 @@ export interface ContentBenchmark {
   avg_likes: number | null;
   avg_comments: number | null;
   content_mix_pct: number | null;
+  benchmark_date: string;
 }
 
 export interface ContentTopic {

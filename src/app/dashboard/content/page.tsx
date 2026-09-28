@@ -34,11 +34,12 @@ export default async function ContentPage() {
   ]);
 
   const self = competitors.find((c) => c.is_self);
-  const selfBenchmarks = benchmarks.filter(
-    (b) => b.competitor_id === self?.id
-  );
+  // Use only the most recent benchmark set
+  const allSelf = benchmarks.filter((b) => b.competitor_id === self?.id);
+  const latestDate = allSelf.reduce((d, b) => (b.benchmark_date > d ? b.benchmark_date : d), '');
+  const selfBenchmarks = allSelf.filter((b) => b.benchmark_date === latestDate);
 
-  // Content performance cards for self
+  // Content performance cards for self; types with no posts in the window are listed separately
   const cards = CT_ORDER.map((ct) => {
     const b = selfBenchmarks.find((x) => x.content_type === ct);
     return {
@@ -48,10 +49,14 @@ export default async function ContentPage() {
       comments: b?.avg_comments ?? 0,
       engagement: b?.avg_engagement ?? 0,
       impressions: b?.avg_impressions ?? 0,
+      hasData: !!b,
     };
   });
+  const activeCards = cards.filter((c) => c.hasData);
+  const emptyTypes = cards.filter((c) => !c.hasData).map((c) => c.label);
+  const asOf = latestDate ? new Date(latestDate + 'T00:00:00Z').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', timeZone: 'UTC' }) : null;
 
-  const efficiency = cards
+  const efficiency = activeCards
     .filter((c) => c.impressions > 0)
     .map((c) => ({
       type: c.label,
@@ -72,8 +77,14 @@ export default async function ContentPage() {
     <div className="space-y-8">
       <section>
         <h2 className="section-title">Content Performance by Type</h2>
+        {asOf && (
+          <p className="text-sm text-text-muted mb-4">
+            Measured from the last 30 days of posts across all platforms, as of {asOf}.
+            {emptyTypes.length > 0 && ` No posts in the window for: ${emptyTypes.join(', ')}.`}
+          </p>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {cards.map((c) => (
+          {activeCards.map((c) => (
             <div key={c.type} className="card p-5">
               <h3 className="font-bold text-base mb-3 pb-2 border-b border-border">{c.label}</h3>
               <div className="grid grid-cols-2 gap-2">

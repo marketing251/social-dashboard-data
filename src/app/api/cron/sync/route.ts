@@ -19,6 +19,15 @@ const CONNECTORS: Record<Platform, SocialConnector | null> = {
   tiktok: null,
 };
 
+// Skip platforms whose API credentials aren't configured instead of
+// logging a failed sync for them every week.
+const REQUIRED_ENV: Partial<Record<Platform, string>> = {
+  youtube: 'YOUTUBE_API_KEY',
+  instagram: 'INSTAGRAM_ACCESS_TOKEN',
+  twitter: 'X_BEARER_TOKEN',
+  linkedin: 'LINKEDIN_ACCESS_TOKEN',
+};
+
 export async function GET(request: Request) {
   // Vercel Cron authenticates with Authorization: Bearer <CRON_SECRET>
   const auth = request.headers.get('authorization');
@@ -45,6 +54,15 @@ export async function GET(request: Request) {
         platform: acc.platform,
         handle: acc.handle,
         result: { skipped: 'no connector' },
+      });
+      continue;
+    }
+    const envKey = REQUIRED_ENV[acc.platform as Platform];
+    if (envKey && !process.env[envKey]) {
+      results.push({
+        platform: acc.platform,
+        handle: acc.handle,
+        result: { skipped: `${envKey} not configured` },
       });
       continue;
     }

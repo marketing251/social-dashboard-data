@@ -12,7 +12,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
   const period = (typeof sp.period === 'string' ? sp.period : 'weekly') as Period;
   const { rows } = await loadKpiSnapshots(period);
   if (rows.length === 0) {
-    return <div className="card p-10 text-center"><h2 className="text-xl font-bold mb-2">No data yet</h2><p className="text-text-muted text-sm">Run the backfill SQL in Supabase to load historical data.</p></div>;
+    return <div className="card p-10 text-center"><h2 className="text-xl font-bold mb-2">No data yet</h2><p className="text-text-muted text-sm">Data syncs daily from the Google Sheet at 7:00 UTC. To load it now, run the sheet-sync cron from Vercel (Settings → Cron Jobs) or <code>supabase/full-backfill.sql</code> in the Supabase SQL Editor.</p></div>;
   }
   const metrics = summaryMetrics(rows);
   const insights = generateInsights(rows, period);

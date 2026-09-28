@@ -24,7 +24,7 @@ export function DashboardNav({ asOf }: { asOf?: AsOfByPeriod }) {
   const asOfLabel = asOf?.[period] ?? asOf?.weekly;
 
   return (
-    <header className="bg-card border-b border-border px-8 py-5 flex items-center justify-between flex-wrap gap-4">
+    <header className="bg-card border-b border-border px-4 sm:px-8 py-5 flex items-center justify-between flex-wrap gap-4">
       <h1 className="text-xl font-bold flex items-center gap-2">
         <span className="text-accent">PropAccount</span> Social Dashboard
       </h1>
@@ -40,7 +40,7 @@ export function DashboardNav({ asOf }: { asOf?: AsOfByPeriod }) {
         {!hideGrowth && <GrowthToggle />}
       </div>
 
-      <nav className="w-full flex gap-0 border-b border-border -mb-5 mt-2">
+      <nav className="w-full flex gap-0 border-b border-border -mb-5 mt-2 overflow-x-auto whitespace-nowrap">
         {TABS.map((tab) => {
           const active = tab.match.test(pathname);
           return (

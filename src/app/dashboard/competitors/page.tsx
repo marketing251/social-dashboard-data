@@ -29,13 +29,15 @@ export default async function CompetitorsPage() {
       return { ...c, ig, tw, yt, fb, tt, li, total: ig + tw + yt + fb + tt + li };
     }
     const s = snapshots.find((x) => x.competitor_id === c.id);
-    const ig = s?.instagram_followers ?? 0;
-    const tw = s?.twitter_followers ?? 0;
-    const yt = s?.youtube_subscribers ?? 0;
-    const fb = s?.facebook_followers ?? 0;
-    const tt = s?.tiktok_followers ?? 0;
-    const li = s?.linkedin_followers ?? 0;
-    return { ...c, ig, tw, yt, fb, tt, li, total: ig + tw + yt + fb + tt + li };
+    // null = account gone or never tracked; rendered as an em dash, not 0
+    const ig = s?.instagram_followers ?? null;
+    const tw = s?.twitter_followers ?? null;
+    const yt = s?.youtube_subscribers ?? null;
+    const fb = s?.facebook_followers ?? null;
+    const tt = s?.tiktok_followers ?? null;
+    const li = s?.linkedin_followers ?? null;
+    const total = (ig ?? 0) + (tw ?? 0) + (yt ?? 0) + (fb ?? 0) + (tt ?? 0) + (li ?? 0);
+    return { ...c, ig, tw, yt, fb, tt, li, total };
   });
 
   const ranked = [...enriched].sort((a, b) => {
@@ -47,15 +49,20 @@ export default async function CompetitorsPage() {
   // Bar chart data
   const chartData = (key: 'ig' | 'tw' | 'yt') =>
     ranked
-      .filter((c) => c[key] > 0)
-      .map((c) => ({ x: c.name, y: c[key] }));
+      .filter((c) => (c[key] ?? 0) > 0)
+      .map((c) => ({ x: c.name, y: c[key] ?? 0 }));
+
+  const latestSnapshotDate = snapshots.reduce((d, s) => (s.snapshot_date > d ? s.snapshot_date : d), '');
+  const snapshotAsOf = latestSnapshotDate
+    ? new Date(latestSnapshotDate + 'T00:00:00Z').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', timeZone: 'UTC' })
+    : null;
 
   return (
     <div className="space-y-8">
       <section>
         <h2 className="section-title">Competitor Landscape</h2>
         <p className="text-sm text-text-muted mb-4">
-          Follower counts from latest snapshots. PropAccount values are live from analytics data.
+          Competitor follower counts captured {snapshotAsOf ?? 'from latest snapshots'}. PropAccount values are live from analytics data. A dash means the account no longer exists or isn&apos;t tracked.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -155,11 +162,11 @@ export default async function CompetitorsPage() {
   );
 }
 
-function MetricCell({ label, value }: { label: string; value: number }) {
+function MetricCell({ label, value }: { label: string; value: number | null }) {
   return (
     <div className="bg-bg rounded-sm p-2">
       <div className="text-[10px] uppercase tracking-wide text-text-muted">{label}</div>
-      <div className="text-base font-bold">{formatNum(value)}</div>
+      <div className={`text-base font-bold ${value == null ? 'text-text-muted' : ''}`}>{value == null ? '—' : formatNum(value)}</div>
     </div>
   );
 }
