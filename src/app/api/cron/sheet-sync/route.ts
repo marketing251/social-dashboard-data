@@ -1,0 +1,65 @@
+import { NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { fetchSheetKpis } from '@/lib/sheet-sync';
+
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
+
+// Daily sync of the PropAccount Google Sheet into kpi_snapshots.
+// Upserts on (account_id, period, period_start), so re-runs are safe and
+// corrections made in the sheet propagate to the dashboard.
+export async function GET(request: Request) {
+  const auth = request.headers.get('authorization');
+  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let rows;
+  try {
+    rows = await fetchSheetKpis();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'unknown';
+    return NextResponse.json({ error: `Sheet fetch/parse failed: ${msg}` }, { status: 502 });
+  }
+
+  const supabase = createAdminClient();
+  const { data: accounts, error: accErr } = await supabase
+    .from('platform_accounts')
+    .select('id, platform')
+    .eq('active', true);
+  if (accErr || !accounts) {
+    return NextResponse.json({ error: accErr?.message ?? 'No accounts' }, { status: 500 });
+  }
+  const accountByPlatform = new Map(accounts.map((a) => [a.platform as string, a.id as string]));
+
+  const payload = rows.flatMap((r) => {
+    const account_id = accountByPlatform.get(r.platform);
+    if (!account_id) return [];
+    return [{
+      account_id,
+      period: r.period,
+      period_start: r.period_start,
+      period_end: r.period_end,
+      period_label: r.period_label,
+      followers: r.followers,
+      impressions: r.impressions,
+      views: r.views,
+      likes: r.likes,
+      shares: r.shares,
+      engagement_rate: r.engagement_rate,
+      watch_time_seconds: r.watch_time_seconds,
+      source: 'google_sheets_sync',
+    }];
+  });
+
+  const { error: upsertErr } = await supabase
+    .from('kpi_snapshots')
+    .upsert(payload, { onConflict: 'account_id,period,period_start' });
+  if (upsertErr) {
+    return NextResponse.json({ error: upsertErr.message, attempted: payload.length }, { status: 500 });
+  }
+
+  const counts: Record<string, number> = {};
+  for (const p of payload) counts[p.period] = (counts[p.period] ?? 0) + 1;
+  return NextResponse.json({ synced: payload.length, byPeriod: counts });
+}
