@@ -58,6 +58,7 @@ export interface Competitor {
   youtube_url: string | null;
   tiktok_url: string | null;
   linkedin_url: string | null;
+  notes: string | null;
   display_order: number;
 }
 
@@ -70,6 +71,7 @@ export interface CompetitorSnapshot {
   youtube_subscribers: number | null;
   tiktok_followers: number | null;
   linkedin_followers: number | null;
+  notes: string | null;
 }
 
 export interface ContentBenchmark {
