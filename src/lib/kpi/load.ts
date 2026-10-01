@@ -46,11 +46,13 @@ export async function loadLatestSheetSync(): Promise<SheetSyncStatus | null> {
     .maybeSingle();
   return (data as SheetSyncStatus) ?? null;
 }
-export async function loadAiInsights(period: Period): Promise<{ insights: unknown[]; generated_at: string } | null> {
+export async function loadAiInsights(period: Period): Promise<{ insights: unknown[]; generated_at: string; data_through: string | null } | null> {
+  // select * so this keeps working before the data_through column exists
   const { data } = await (await createClient())
     .from('ai_insights')
-    .select('insights, generated_at')
+    .select('*')
     .eq('period', period)
     .maybeSingle();
-  return (data as { insights: unknown[]; generated_at: string }) ?? null;
+  if (!data) return null;
+  return { insights: data.insights, generated_at: data.generated_at, data_through: data.data_through ?? null };
 }

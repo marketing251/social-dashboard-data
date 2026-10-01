@@ -12,6 +12,8 @@ export interface AiInsightRow {
   insights: Insight[];
   model: string | null;
   generated_at: string;
+  /** period_start of the latest period the insights were generated from */
+  data_through: string | null;
 }
 
 /**
@@ -42,42 +44,16 @@ export async function generateAiInsights(admin: SupabaseClient): Promise<{ gener
       if (error) throw new Error(error.message);
       if (!snaps?.length) continue;
 
-      const table = snaps
-        .reverse()
-        .map((s) => {
-          const p = platformById.get(s.account_id) ?? '?';
-          const fields = [
-            s.followers != null && `followers=${s.followers}`,
-            s.impressions != null && `impressions=${s.impressions}`,
-            s.views != null && `views=${s.views}`,
-            s.likes != null && `likes=${s.likes}`,
-            s.shares != null && `shares=${s.shares}`,
-            s.engagement_rate != null && `eng_rate=${s.engagement_rate}%`,
-            s.watch_time_seconds != null && `watch_h=${Math.round(Number(s.watch_time_seconds) / 3600)}`,
-          ].filter(Boolean).join(' ');
-          return `${s.period_label} ${p}: ${fields}`;
-        })
-        .join('\n');
+      const { system, user, latestStart } = buildInsightPrompt(
+        period,
+        snaps.reverse().map((s) => ({ ...s, platform: platformById.get(s.account_id) ?? '?' })),
+      );
 
       const response = await client.messages.create({
         model: 'claude-opus-5-5',
         max_tokens: 4000,
-        system:
-          'You are a social media analyst for PropAccount, a white-label prop-firm technology provider. ' +
-          'You analyze cross-platform KPI history (Twitter/X, Instagram, Facebook, YouTube, TikTok, LinkedIn) and produce sharp, specific, non-generic insights a marketing lead can act on. ' +
-          'Look for multi-period trends, inflection points, cross-platform patterns, and momentum shifts — not just latest-vs-previous deltas. Reference concrete numbers and period labels. ' +
-          'Editorial rules: at least 3 insights must be positive (cls "positive" — wins, growth, momentum); at most 3 may be negative or cautionary (cls "negative" or "warning"). ' +
-          'Never question or speculate about the authenticity, source, or legitimacy of engagement — no commentary about suspect, inflated, internal, bot, or inauthentic engagement of any kind. Treat all metrics as genuine and focus on trends and actions.',
-        messages: [
-          {
-            role: 'user',
-            content:
-              `Here is PropAccount's ${period} KPI history, one line per platform per period (oldest first):\n\n${table}\n\n` +
-              'Return the 6 most valuable insights as a JSON array, no other text — at least 3 positive, at most 3 negative/cautionary. Each item: ' +
-              '{"icon": "<one emoji>", "cls": "positive"|"negative"|"warning"|"info", "tag": "win"|"alert"|"action"|"watch", ' +
-              '"tagLabel": "<2-3 word label>", "title": "<one-line headline with numbers>", "body": "<2-3 sentences: what happened, why it likely happened, what to do>"}',
-          },
-        ],
+        system,
+        messages: [{ role: 'user', content: user }],
       });
 
       const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
@@ -86,7 +62,7 @@ export async function generateAiInsights(admin: SupabaseClient): Promise<{ gener
 
       const { error: upsertErr } = await admin
         .from('ai_insights')
-        .upsert({ period, insights, model: response.model, generated_at: new Date().toISOString() }, { onConflict: 'period' });
+        .upsert({ period, insights, model: response.model, generated_at: new Date().toISOString(), data_through: latestStart }, { onConflict: 'period' });
       if (upsertErr) throw new Error(upsertErr.message);
       generated++;
     } catch (err) {
@@ -94,6 +70,84 @@ export async function generateAiInsights(admin: SupabaseClient): Promise<{ gener
     }
   }
   return { generated, errors };
+}
+
+export interface PromptSnapshot {
+  platform: string;
+  period_label: string;
+  period_start: string;
+  followers: number | null;
+  impressions: number | null;
+  views: number | null;
+  likes: number | null;
+  shares: number | null;
+  engagement_rate: number | null;
+  watch_time_seconds: number | null;
+}
+
+function metricsOf(s: PromptSnapshot): Record<string, number> {
+  const m: Record<string, number> = {};
+  if (s.followers != null) m.followers = Number(s.followers);
+  if (s.impressions != null) m.impressions = Number(s.impressions);
+  if (s.views != null) m.views = Number(s.views);
+  if (s.likes != null) m.likes = Number(s.likes);
+  if (s.shares != null) m.shares = Number(s.shares);
+  if (s.engagement_rate != null) m.eng_rate_pct = Number(s.engagement_rate);
+  if (s.watch_time_seconds != null) m.watch_hours = Math.round(Number(s.watch_time_seconds) / 3600);
+  return m;
+}
+
+/** Build the insight prompt from snapshots ordered oldest-first. Exported for dry-runs. */
+export function buildInsightPrompt(period: Period, ordered: PromptSnapshot[]) {
+  const table = ordered
+    .map((s) => `${s.period_label} ${s.platform}: ${Object.entries(metricsOf(s)).map(([k, v]) => `${k}=${v}`).join(' ')}`)
+    .join('\n');
+
+  // Exact latest-vs-previous deltas, computed here so the model never has to
+  const starts = Array.from(new Set(ordered.map((s) => s.period_start))).sort();
+  const latestStart = starts[starts.length - 1];
+  const prevStart = starts[starts.length - 2];
+  const labelOf = (start: string | undefined) => ordered.find((s) => s.period_start === start)?.period_label ?? start ?? 'n/a';
+  const changeLines: string[] = [];
+  if (prevStart) {
+    for (const latest of ordered.filter((s) => s.period_start === latestStart)) {
+      const prev = ordered.find((s) => s.period_start === prevStart && s.platform === latest.platform);
+      const lm = metricsOf(latest); const pm = prev ? metricsOf(prev) : {};
+      const parts = Object.entries(lm).map(([k, v]) => {
+        const p = pm[k];
+        if (p == null) return `${k} ${v} (no prior value)`;
+        if (p === 0) return `${k} ${p} → ${v}`;
+        const pct = ((v - p) / p) * 100;
+        return `${k} ${p} → ${v} (${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%, ${v > p ? 'UP' : v < p ? 'DOWN' : 'FLAT'})`;
+      });
+      changeLines.push(`${latest.platform}: ${parts.join('; ')}`);
+    }
+  }
+  const latestPlatforms = new Set(ordered.filter((s) => s.period_start === latestStart).map((s) => s.platform));
+  const notReported = Array.from(new Set(ordered.filter((s) => s.period_start === prevStart).map((s) => s.platform)))
+    .filter((p) => !latestPlatforms.has(p));
+
+  const system =
+    'You are a social media analyst for PropAccount, a white-label prop-firm technology provider. ' +
+    'You analyze cross-platform KPI history (Twitter/X, Instagram, Facebook, YouTube, TikTok, LinkedIn) and produce sharp, specific, non-generic insights a marketing lead can act on. ' +
+    'Look for multi-period trends, inflection points, cross-platform patterns, and momentum shifts — not just latest-vs-previous deltas. Reference concrete numbers and period labels. ' +
+    'Editorial rules: at least 3 insights must be positive (cls "positive" — wins, growth, momentum); at most 3 may be negative or cautionary (cls "negative" or "warning"). ' +
+    'Never question or speculate about the authenticity, source, or legitimacy of engagement — no commentary about suspect, inflated, internal, bot, or inauthentic engagement of any kind. Treat all metrics as genuine and focus on trends and actions.';
+
+  const user =
+    `Here is PropAccount's ${period} KPI history, one line per platform per period (oldest first):\n\n${table}\n\n` +
+    `The latest period is ${labelOf(latestStart)}; the previous period is ${labelOf(prevStart)}. ` +
+    `Exact changes from ${labelOf(prevStart)} to ${labelOf(latestStart)}, computed for you:\n${changeLines.join('\n')}\n\n` +
+    (notReported.length
+      ? `Not yet reported for ${labelOf(latestStart)}: ${notReported.join(', ')}. Their data has not been entered, which is not a decline — do not write insights about these platforms' latest period, and do not count them in cross-platform totals.\n\n`
+      : '') +
+    `Every insight must be anchored in the latest period (${labelOf(latestStart)}). Older periods may be cited only as context for a trend that continues into the latest one — never describe an earlier period's change as the current state. ` +
+    'Any claim that a metric is up or down must agree with the UP/DOWN in the change table above; use those exact numbers rather than recomputing. ' +
+    'Return the 6 most valuable insights as a JSON array, no other text — at least 3 positive, at most 3 negative/cautionary. Each item: ' +
+    '{"icon": "<one emoji>", "cls": "positive"|"negative"|"warning"|"info", "tag": "win"|"alert"|"action"|"watch", ' +
+    '"tagLabel": "<2-3 word label>", "title": "<one-line headline with numbers>", "body": "<2-3 sentences: what happened, why it likely happened, what to do>"}';
+
+  return { system, user, latestStart };
 }
 
 // Hard editorial filter: never surface engagement-authenticity commentary,

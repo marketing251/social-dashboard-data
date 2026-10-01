@@ -28,8 +28,11 @@ export default async function PlatformsPage({ searchParams }: { searchParams: Pr
 
   // Metrics this platform actually reports (drives both the KPI boxes and the chart)
   const available = METRICS.filter((m) => snap?.[m] != null);
+  // When the latest period isn't reported yet, chart the metrics it last had
+  const lastReported = [...rows].reverse().find((r) => r.byPlatform[selected])?.byPlatform[selected];
+  const chartable = available.length ? available : METRICS.filter((m) => lastReported?.[m] != null);
   const requested = typeof sp.metric === 'string' ? (sp.metric as Metric) : null;
-  const metric: Metric = requested && available.includes(requested) ? requested : (available[0] ?? 'followers');
+  const metric: Metric = requested && chartable.includes(requested) ? requested : (chartable[0] ?? 'followers');
 
   const chartData = rows.map((r) => ({ x: r.period_label, y: r.byPlatform[selected]?.[metric] ?? null }));
 
@@ -45,7 +48,9 @@ export default async function PlatformsPage({ searchParams }: { searchParams: Pr
       </section>
       <section>
         <h2 className="section-title">KPI Summary — {meta.label}</h2>
-        <p className="text-sm text-text-muted -mt-2 mb-4">Select a metric to chart it below.</p>
+        {snap
+          ? <p className="text-sm text-text-muted -mt-2 mb-4">Select a metric to chart it below.</p>
+          : <p className="text-sm text-warning -mt-2 mb-4">{meta.label} hasn&apos;t been reported for {latest.period_label} yet. The chart shows the history through the last reported period.</p>}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {available.map(m => {
             const v = snap?.[m]; if (v == null) return null;

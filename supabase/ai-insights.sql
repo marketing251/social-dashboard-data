@@ -12,6 +12,10 @@ create table if not exists ai_insights (
     generated_at timestamptz default now()
 );
 
+-- Latest period_start the insights were built from; the dashboard hides
+-- insights whose data_through is older than the KPIs it is showing.
+alter table ai_insights add column if not exists data_through date;
+
 alter table ai_insights enable row level security;
 create policy "auth_read_ai_insights" on ai_insights for select
     using (auth.role() = 'authenticated');

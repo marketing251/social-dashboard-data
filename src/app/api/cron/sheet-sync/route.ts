@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const logSync = async (status: 'success' | 'failed', rowsInserted: number, errorMessage?: string) => {
+  const logSync = async (status: 'success' | 'partial' | 'failed', rowsInserted: number, errorMessage?: string) => {
     await supabase.from('sync_logs').insert({
       platform: null,
       account_id: null,
@@ -77,8 +77,12 @@ export async function GET(request: Request) {
   }
   await logSync('success', payload.length);
 
-  // Regenerate AI insights from the fresh data; never fails the sync
+  // Regenerate AI insights from the fresh data; never fails the sync, but a
+  // failure is logged as a 'partial' run so the header sync chip shows it.
   const ai = await generateAiInsights(supabase);
+  if (ai.errors.length > 0) {
+    await logSync('partial', payload.length, `Data synced; AI insights failed: ${ai.errors.join(' | ')}`);
+  }
 
   const counts: Record<string, number> = {};
   for (const p of payload) counts[p.period] = (counts[p.period] ?? 0) + 1;

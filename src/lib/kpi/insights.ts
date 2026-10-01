@@ -1,7 +1,7 @@
 import type { MergedPeriodRow, Period } from './types';
 import { PLATFORMS, PLATFORM_META } from './types';
 import { formatNum, formatPct, pctChange, periodLabels } from './format';
-import { platformLatest, sumField } from './aggregate';
+import { commonPlatforms, restrictRow, sumField } from './aggregate';
 
 export type InsightTag = 'win' | 'alert' | 'action' | 'watch';
 export type InsightClass = 'positive' | 'negative' | 'warning' | 'info';
@@ -27,8 +27,12 @@ export function generateInsights(
   const first = rows[0];
   const out: Insight[] = [];
 
+  // Only platforms reported in both periods; a platform missing from the
+  // latest period (not yet entered in the sheet) is not a 100% drop
+  const reported = PLATFORMS.filter((p) => latest.byPlatform[p] && prev.byPlatform[p]);
+
   // Per-platform follower WoW
-  const platformGrowth = PLATFORMS.map((p) => {
+  const platformGrowth = reported.map((p) => {
     const curr = latest.byPlatform[p]?.followers ?? 0;
     const prv = prev.byPlatform[p]?.followers ?? 0;
     return { platform: p, curr, prev: prv, change: pctChange(curr, prv) };
@@ -48,7 +52,7 @@ export function generateInsights(
   }
 
   // 2. Biggest reach mover
-  const reachData = PLATFORMS.map((p) => {
+  const reachData = reported.map((p) => {
     const curr =
       latest.byPlatform[p]?.impressions ?? latest.byPlatform[p]?.views ?? 0;
     const prv =
@@ -94,10 +98,9 @@ export function generateInsights(
 
   // 4. Cross-platform audience
   const totalCurr = sumField(latest, 'followers');
-  const totalPrev = sumField(prev, 'followers');
-  const totalFirst = sumField(first, 'followers');
-  const totalChange = pctChange(totalCurr, totalPrev);
-  const allTime = pctChange(totalCurr, totalFirst);
+  const totalChange = pctChange(sumField(restrictRow(latest, reported), 'followers'), sumField(restrictRow(prev, reported), 'followers'));
+  const sinceFirst = commonPlatforms(latest, first);
+  const allTime = pctChange(sumField(restrictRow(latest, sinceFirst), 'followers'), sumField(restrictRow(first, sinceFirst), 'followers'));
   const topContrib = platformGrowth
     .filter((p) => p.change > 0)
     .sort((a, b) => b.change - a.change)
@@ -134,16 +137,16 @@ export function generateInsights(
 
   // 6. Consistency score
   const growing = platformGrowth.filter((p) => p.change > 0).length;
-  if (growing === PLATFORMS.length) {
+  if (reported.length > 0 && growing === reported.length) {
     out.push({
       icon: '✅',
       cls: 'positive',
       tag: 'win',
       tagLabel: 'All Green',
-      title: `All ${PLATFORMS.length} Platforms Grew ${thisPeriod}`,
+      title: `All ${reported.length} Reported Platforms Grew ${thisPeriod}`,
       body: 'Every platform added followers. Healthy cross-platform momentum. Maintain cadence and strategy.',
     });
-  } else if (growing === 0) {
+  } else if (reported.length > 0 && growing === 0) {
     out.push({
       icon: '🚨',
       cls: 'negative',

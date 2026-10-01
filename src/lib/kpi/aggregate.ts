@@ -53,16 +53,45 @@ export function sumField(
   }, 0);
 }
 
-/** Compute latest vs previous for a derived metric */
+/** Keep only the given platforms in a row */
+export function restrictRow(row: MergedPeriodRow, platforms: Platform[]): MergedPeriodRow {
+  const byPlatform: MergedPeriodRow['byPlatform'] = {};
+  for (const p of platforms) if (row.byPlatform[p]) byPlatform[p] = row.byPlatform[p];
+  return { ...row, byPlatform };
+}
+
+/** Platforms reported in both rows */
+export function commonPlatforms(a: MergedPeriodRow, b: MergedPeriodRow): Platform[] {
+  return (Object.keys(a.byPlatform) as Platform[]).filter((p) => a.byPlatform[p] && b.byPlatform[p]);
+}
+
+/**
+ * Platforms reported in the previous period but not (yet) in the latest one,
+ * e.g. a sheet column the team hasn't filled in for the month.
+ */
+export function missingInLatest(rows: MergedPeriodRow[]): Platform[] {
+  if (rows.length < 2) return [];
+  const latest = rows[rows.length - 1]; const prev = rows[rows.length - 2];
+  return (Object.keys(prev.byPlatform) as Platform[]).filter((p) => prev.byPlatform[p] && !latest.byPlatform[p]);
+}
+
+/**
+ * Compute latest vs previous for a derived metric. The value covers every
+ * platform in the latest period; the change compares only platforms reported
+ * in both, so a platform missing from one period can't fake a swing.
+ */
 export function comparePeriods(
   rows: MergedPeriodRow[],
   fn: (row: MergedPeriodRow) => number
 ): { value: number; previous: number | null; change: number | null } {
   if (rows.length === 0) return { value: 0, previous: null, change: null };
-  const latest = fn(rows[rows.length - 1]);
+  const latestRow = rows[rows.length - 1];
+  const latest = fn(latestRow);
   if (rows.length === 1) return { value: latest, previous: null, change: null };
-  const previous = fn(rows[rows.length - 2]);
-  return { value: latest, previous, change: pctChange(latest, previous) };
+  const prevRow = rows[rows.length - 2];
+  const common = commonPlatforms(latestRow, prevRow);
+  const previous = fn(prevRow);
+  return { value: latest, previous, change: pctChange(fn(restrictRow(latestRow, common)), fn(restrictRow(prevRow, common))) };
 }
 
 /** Aggregated metrics for the summary hero cards */

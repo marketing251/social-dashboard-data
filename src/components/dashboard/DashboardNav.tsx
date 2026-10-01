@@ -20,17 +20,16 @@ function relativeTime(iso: string): string {
 
 function SyncChip({ sync }: { sync: SheetSyncStatus | null }) {
   if (!sync) return null;
-  const ok = sync.status === 'success';
+  const state = sync.status === 'success' ? 'ok' : sync.status === 'partial' ? 'partial' : 'failed';
+  const label = { ok: 'Synced', partial: 'Synced, insights failed', failed: 'Sync failed' }[state];
+  const title = state === 'ok'
+    ? `Last sheet sync: ${sync.rows_inserted ?? 0} rows`
+    : sync.error_message ?? 'unknown error';
   return (
-    <div
-      className="no-print flex items-center gap-1.5 text-xs text-text-muted"
-      title={ok
-        ? `Last sheet sync: ${sync.rows_inserted ?? 0} rows`
-        : `Sheet sync failed: ${sync.error_message ?? 'unknown error'}`}
-    >
-      <span className={cn('w-2 h-2 rounded-full', ok ? 'bg-green' : 'bg-red')} />
+    <div className="no-print flex items-center gap-1.5 text-xs text-text-muted" title={title}>
+      <span className={cn('w-2 h-2 rounded-full', state === 'ok' ? 'bg-green' : state === 'partial' ? 'bg-warning' : 'bg-red')} />
       <span suppressHydrationWarning>
-        {ok ? 'Synced' : 'Sync failed'}{sync.finished_at ? ` ${relativeTime(sync.finished_at)}` : ''}
+        {label}{sync.finished_at ? ` ${relativeTime(sync.finished_at)}` : ''}
       </span>
     </div>
   );

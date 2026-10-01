@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 import { loadKpiSnapshots, loadAiInsights } from '@/lib/kpi/load';
-import { summaryMetrics } from '@/lib/kpi/aggregate';
+import { summaryMetrics, missingInLatest } from '@/lib/kpi/aggregate';
 import { generateInsights, type Insight } from '@/lib/kpi/insights';
 import { sanitizeInsights } from '@/lib/ai-insights';
 import { PLATFORM_META, PLATFORMS, type Period } from '@/lib/kpi/types';
@@ -16,7 +16,11 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
   }
   const metrics = summaryMetrics(rows);
   const ruleInsights = generateInsights(rows, period);
-  const aiInsights = sanitizeInsights((ai?.insights ?? []) as Insight[]);
+  // AI insights are only shown when generated from the same latest period the
+  // KPIs show; otherwise they describe old data, so fall back to live rules.
+  const latestStart = rows[rows.length - 1].period_start;
+  const aiFresh = ai?.data_through === latestStart;
+  const aiInsights = aiFresh ? sanitizeInsights((ai?.insights ?? []) as Insight[]) : [];
   const insights = aiInsights.length > 0 ? aiInsights : ruleInsights;
   const aiGeneratedAt = aiInsights.length > 0 && ai?.generated_at
     ? new Date(ai.generated_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
@@ -43,6 +47,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
       rowCount={rows.length}
       insights={insights}
       aiGeneratedAt={aiGeneratedAt}
+      missingPlatforms={missingInLatest(rows)}
     />
   );
 }

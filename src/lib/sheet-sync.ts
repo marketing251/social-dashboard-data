@@ -129,6 +129,9 @@ function parseTab(csv: string, period: SheetPeriod, monthYear: number): SheetKpi
   }
   if (headerRowIdx === -1) throw new Error(`No platform headers found in ${period} tab`);
 
+  // Periods still in progress are skipped: a partially entered month or quarter
+  // compared against a complete one produces fake swings on the dashboard.
+  const today = new Date().toISOString().slice(0, 10);
   const out: SheetKpiRow[] = [];
   for (let r = headerRowIdx + 1; r < rows.length; r++) {
     for (const block of blockCols) {
@@ -138,6 +141,7 @@ function parseTab(csv: string, period: SheetPeriod, monthYear: number): SheetKpi
         period === 'monthly' ? parseMonthLabel(label, monthYear) :
         parseQuarterLabel(label);
       if (!parsed) continue;
+      if (parsed.period_end >= today) continue;
 
       const values: Record<string, number | null> = {};
       let hasData = false;
