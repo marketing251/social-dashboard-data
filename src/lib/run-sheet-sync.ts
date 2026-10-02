@@ -96,13 +96,25 @@ export async function syncSheetToDb(admin: SupabaseClient): Promise<SheetSyncRes
 }
 
 /**
- * Regenerate AI insights from the synced data. Never throws; a failure is
- * logged as a 'partial' sync so the header chip shows it.
+ * Regenerate AI insights from the synced data. Never throws. A failure is
+ * logged as a 'partial' sync so the header chip shows it; a success after an
+ * earlier failure logs a 'success' row so the chip clears.
  */
-export async function refreshAiInsights(admin: SupabaseClient, syncedRows: number) {
+export async function refreshAiInsights(admin: SupabaseClient) {
+  const started = Date.now();
   const ai = await generateAiInsights(admin);
+  const { data: last } = await admin
+    .from('sync_logs')
+    .select('status, rows_inserted')
+    .is('account_id', null)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const rows = last?.rows_inserted ?? 0;
   if (ai.errors.length > 0) {
-    await logSync(admin, Date.now(), 'partial', syncedRows, `Data synced; AI insights failed: ${ai.errors.join(' | ')}`);
+    await logSync(admin, started, 'partial', rows, `Data synced; AI insights failed: ${ai.errors.join(' | ')}`);
+  } else if (last?.status === 'partial') {
+    await logSync(admin, started, 'success', rows);
   }
   return ai;
 }

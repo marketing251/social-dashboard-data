@@ -18,6 +18,6 @@ export async function GET(request: Request) {
   const result = await syncSheetToDb(supabase);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 500 });
 
-  const ai = await refreshAiInsights(supabase, result.synced);
+  const ai = await refreshAiInsights(supabase);
   return NextResponse.json({ synced: result.synced, byPeriod: result.byPeriod, aiInsights: ai });
 }

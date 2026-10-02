@@ -29,10 +29,9 @@ export async function generateAiInsights(admin: SupabaseClient): Promise<{ gener
   const platformById = new Map(accounts.map((a) => [a.id as string, a.platform as string]));
 
   const client = new Anthropic();
-  const errors: string[] = [];
-  let generated = 0;
 
-  for (const period of PERIODS) {
+  // The three periods are independent, so generate them in parallel
+  const results = await Promise.all(PERIODS.map(async (period): Promise<string | null> => {
     try {
       // Most recent snapshots for this period (all platforms), oldest-first for the prompt
       const { data: snaps, error } = await admin
@@ -42,36 +41,70 @@ export async function generateAiInsights(admin: SupabaseClient): Promise<{ gener
         .order('period_start', { ascending: false })
         .limit(period === 'weekly' ? 84 : 72); // ~14 weeks / 12 months / all quarters x 6 platforms
       if (error) throw new Error(error.message);
-      if (!snaps?.length) continue;
+      if (!snaps?.length) return null;
 
       const { system, user, latestStart } = buildInsightPrompt(
         period,
         snaps.reverse().map((s) => ({ ...s, platform: platformById.get(s.account_id) ?? '?' })),
       );
 
-      const response = await client.messages.create({
+      // Thinking is always on for this model and counts toward max_tokens, so
+      // leave ample room; low effort keeps it quick for a short write-up.
+      // Structured output guarantees the reply parses as the insights schema.
+      const response = await client.beta.messages.create({
         model: 'claude-opus-5-5',
-        max_tokens: 4000,
+        max_tokens: 16000,
+        betas: ['server-side-fallback-2026-07-01'],
+        fallbacks: 'default',
+        output_config: { effort: 'low', format: { type: 'json_schema', schema: INSIGHTS_SCHEMA } },
         system,
         messages: [{ role: 'user', content: user }],
       });
 
-      const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+      if (response.stop_reason === 'refusal') throw new Error('model declined the request');
+      if (response.stop_reason === 'max_tokens') throw new Error('model ran out of output tokens');
+      const text = response.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
       const insights = parseInsights(text);
-      if (!insights.length) throw new Error('model returned no parseable insights');
+      if (!insights.length) throw new Error(`model returned no usable insights (stop_reason: ${response.stop_reason})`);
 
       const { error: upsertErr } = await admin
         .from('ai_insights')
         // data_through lives inside the jsonb so no schema migration is needed
         .upsert({ period, insights: { data_through: latestStart, items: insights }, model: response.model, generated_at: new Date().toISOString() }, { onConflict: 'period' });
       if (upsertErr) throw new Error(upsertErr.message);
-      generated++;
+      return null;
     } catch (err) {
-      errors.push(`${period}: ${err instanceof Error ? err.message : 'unknown'}`);
+      return `${period}: ${err instanceof Error ? err.message : 'unknown'}`;
     }
-  }
-  return { generated, errors };
+  }));
+
+  const errors = results.filter((e): e is string => e !== null);
+  return { generated: PERIODS.length - errors.length, errors };
 }
+
+const INSIGHTS_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['insights'],
+  properties: {
+    insights: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['icon', 'cls', 'tag', 'tagLabel', 'title', 'body'],
+        properties: {
+          icon: { type: 'string' },
+          cls: { type: 'string', enum: ['positive', 'negative', 'warning', 'info'] },
+          tag: { type: 'string', enum: ['win', 'alert', 'action', 'watch'] },
+          tagLabel: { type: 'string' },
+          title: { type: 'string' },
+          body: { type: 'string' },
+        },
+      },
+    },
+  },
+};
 
 export interface PromptSnapshot {
   platform: string;
@@ -150,7 +183,7 @@ export function buildInsightPrompt(period: Period, allRows: PromptSnapshot[]) {
       : '') +
     `Every insight must be anchored in the latest period (${labelOf(latestStart)}). Older periods may be cited only as context for a trend that continues into the latest one — never describe an earlier period's change as the current state. ` +
     'Any claim that a metric is up or down must agree with the UP/DOWN in the change table above; use those exact numbers rather than recomputing. ' +
-    'Return the 6 most valuable insights as a JSON array, no other text — at least 3 positive, at most 3 negative/cautionary. Each item: ' +
+    'Return the 6 most valuable insights in the "insights" array — at least 3 positive, at most 3 negative/cautionary. Each item: ' +
     '{"icon": "<one emoji>", "cls": "positive"|"negative"|"warning"|"info", "tag": "win"|"alert"|"action"|"watch", ' +
     '"tagLabel": "<2-3 word label>", "title": "<one-line headline with numbers>", "body": "<2-3 sentences: what happened, why it likely happened, what to do>"}';
 
@@ -181,11 +214,17 @@ export function sanitizeInsights(list: Insight[]): Insight[] {
   return out;
 }
 
-function parseInsights(text: string): Insight[] {
-  const match = text.match(/\[[\s\S]*\]/);
-  if (!match) return [];
+export function parseInsights(text: string): Insight[] {
+  // Structured output: {"insights": [...]}; a bare array is accepted too
   let raw: unknown;
-  try { raw = JSON.parse(match[0]); } catch { return []; }
+  try {
+    const parsed = JSON.parse(text);
+    raw = Array.isArray(parsed) ? parsed : parsed?.insights;
+  } catch {
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) return [];
+    try { raw = JSON.parse(match[0]); } catch { return []; }
+  }
   if (!Array.isArray(raw)) return [];
   const all = raw
     .filter((i): i is Record<string, string> => !!i && typeof i === 'object')
