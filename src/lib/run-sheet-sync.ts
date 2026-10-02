@@ -70,7 +70,25 @@ export async function syncSheetToDb(admin: SupabaseClient): Promise<SheetSyncRes
     await logSync(admin, started, 'failed', 0, upsertErr.message);
     return { ok: false, error: upsertErr.message };
   }
-  await logSync(admin, started, 'success', payload.length);
+
+  // Remove sheet-synced rows the sheet no longer has (rows deleted or moved
+  // in the sheet, or periods imported before they finished). Capped so a sheet
+  // format change that breaks parsing can't wipe the history.
+  const keep = new Set(payload.map((p) => `${p.account_id}|${p.period}|${p.period_start}`));
+  const { data: existing } = await admin
+    .from('kpi_snapshots')
+    .select('id, account_id, period, period_start')
+    .eq('source', 'google_sheets_sync');
+  const stale = (existing ?? []).filter((r) => !keep.has(`${r.account_id}|${r.period}|${r.period_start}`));
+  let pruneNote: string | undefined;
+  if (stale.length > 0 && stale.length <= Math.max(12, Math.ceil((existing?.length ?? 0) * 0.1))) {
+    const { error: delErr } = await admin.from('kpi_snapshots').delete().in('id', stale.map((r) => r.id));
+    if (delErr) pruneNote = `Could not remove ${stale.length} rows no longer in the sheet: ${delErr.message}`;
+  } else if (stale.length > 0) {
+    pruneNote = `Skipped removing ${stale.length} rows no longer in the sheet (too many — check the sheet layout)`;
+  }
+
+  await logSync(admin, started, pruneNote ? 'partial' : 'success', payload.length, pruneNote);
 
   const byPeriod: Record<string, number> = {};
   for (const p of payload) byPeriod[p.period] = (byPeriod[p.period] ?? 0) + 1;

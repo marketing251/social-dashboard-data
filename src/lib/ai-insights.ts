@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Insight, InsightClass, InsightTag } from '@/lib/kpi/insights';
 import type { Period } from '@/lib/kpi/types';
+import { trimSparseTail } from '@/lib/kpi/aggregate';
 
 const PERIODS: Period[] = ['weekly', 'monthly', 'quarterly'];
 const VALID_CLS: InsightClass[] = ['positive', 'negative', 'warning', 'info'];
@@ -98,7 +99,13 @@ function metricsOf(s: PromptSnapshot): Record<string, number> {
 }
 
 /** Build the insight prompt from snapshots ordered oldest-first. Exported for dry-runs. */
-export function buildInsightPrompt(period: Period, ordered: PromptSnapshot[]) {
+export function buildInsightPrompt(period: Period, allRows: PromptSnapshot[]) {
+  // Same latest period the dashboard shows: drop sparse trailing periods
+  const counts = new Map<string, number>();
+  for (const s of allRows) counts.set(s.period_start, (counts.get(s.period_start) ?? 0) + 1);
+  const keptStarts = new Set(trimSparseTail(Array.from(counts.keys()).sort(), (start) => counts.get(start) ?? 0));
+  const ordered = allRows.filter((s) => keptStarts.has(s.period_start));
+
   const table = ordered
     .map((s) => `${s.period_label} ${s.platform}: ${Object.entries(metricsOf(s)).map(([k, v]) => `${k}=${v}`).join(' ')}`)
     .join('\n');

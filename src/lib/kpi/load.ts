@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import type { KpiSnapshot, MergedPeriodRow, Period, PlatformAccount, Competitor, CompetitorSnapshot, ContentBenchmark, ContentTopic } from './types';
-import { mergeSnapshotsByPeriod } from './aggregate';
+import { mergeSnapshotsByPeriod, trimSparseTail } from './aggregate';
 
 export async function loadPlatformAccounts(): Promise<PlatformAccount[]> {
   const supabase = await createClient();
@@ -14,7 +14,8 @@ export async function loadKpiSnapshots(period: Period): Promise<{ accounts: Plat
   const supabase = await createClient();
   const { data, error } = await supabase.from('kpi_snapshots').select('*').eq('period', period).in('account_id', accounts.map(a => a.id)).order('period_start', { ascending: true });
   if (error) { console.error('[load]', error); return { accounts, rows: [] }; }
-  return { accounts, rows: mergeSnapshotsByPeriod(accounts, (data ?? []) as KpiSnapshot[]) };
+  const merged = mergeSnapshotsByPeriod(accounts, (data ?? []) as KpiSnapshot[]);
+  return { accounts, rows: trimSparseTail(merged, (r) => Object.keys(r.byPlatform).length) };
 }
 export async function loadCompetitors(): Promise<Competitor[]> {
   const { data } = await (await createClient()).from('competitors').select('*').order('display_order', { ascending: true });

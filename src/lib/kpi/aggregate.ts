@@ -53,6 +53,19 @@ export function sumField(
   }, 0);
 }
 
+/**
+ * Drop trailing periods that fewer than half of the platforms have reported:
+ * a stray or half-entered sheet row must not become the "latest" period.
+ * A period with most platforms in (one entered late) is kept.
+ */
+export function trimSparseTail<T>(periods: T[], countOf: (p: T) => number): T[] {
+  const max = periods.reduce((m, p) => Math.max(m, countOf(p)), 0);
+  const min = Math.ceil(max / 2);
+  let end = periods.length;
+  while (end > 0 && countOf(periods[end - 1]) < min) end--;
+  return periods.slice(0, end);
+}
+
 /** Keep only the given platforms in a row */
 export function restrictRow(row: MergedPeriodRow, platforms: Platform[]): MergedPeriodRow {
   const byPlatform: MergedPeriodRow['byPlatform'] = {};
