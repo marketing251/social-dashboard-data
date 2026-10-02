@@ -72,10 +72,12 @@
   }
 }
 
-/* Print / "Export PDF": light report layout, branded footer, no browser chrome */
+/* Print / "Export PDF": dark report layout, branded footer, no browser chrome */
 @page {
   size: letter;
   margin: 0.5in 0.5in 0.6in;
+  /* Page background (incl. margins) matches the dashboard's dark --bg */
+  background: #111418;
   /* Defining margin boxes replaces the browser's date/URL header and footer */
   @top-left { content: ''; }
   @bottom-left {
@@ -93,22 +95,23 @@
 }
 
 @media print {
+  /* Always the dark theme on paper, even when the viewer is in light mode */
   :root,
   .light {
-    --bg: 220 16% 96%;
-    --card: 0 0% 100%;
-    --border: 220 13% 87%;
-    --text: 228 18% 13%;
-    --text-muted: 222 10% 42%;
-    --accent: 238 83% 58%;
-    --green: 142 76% 32%;
-    --red: 0 72% 47%;
-    --warning: 30 90% 42%;
+    --bg: 225 20% 8%;
+    --card: 228 18% 13%;
+    --border: 228 14% 20%;
+    --text: 220 10% 90%;
+    --text-muted: 222 11% 60%;
+    --accent: 239 84% 67%;
+    --green: 142 71% 45%;
+    --red: 0 84% 60%;
+    --warning: 38 92% 50%;
     --shadow: none;
   }
   html,
   body {
-    background: #fff !important;
+    background: #111418 !important;
     min-height: 0 !important;
   }
   * {

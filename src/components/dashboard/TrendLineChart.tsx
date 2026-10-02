@@ -46,8 +46,8 @@ function usePrinting() {
 export function TrendLineChart({ series, height = 300, printHeight }: { series: LineSeries[]; height?: number; printHeight?: number }) {
   const { theme } = useTheme();
   const printing = usePrinting();
-  // Printed pages are always light
-  const dark = theme === 'dark' && !printing;
+  // Printed pages are always dark
+  const dark = theme === 'dark' || printing;
   const grid = dark ? '#2a2d3a44' : '#0000001a';
   const axis = dark ? '#8b8fa3' : '#5f6577';
   const tipBg = dark ? '#1a1d27' : '#ffffff';

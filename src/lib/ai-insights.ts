@@ -10,11 +10,10 @@ const VALID_TAG: InsightTag[] = ['win', 'alert', 'action', 'watch'];
 
 export interface AiInsightRow {
   period: Period;
-  insights: Insight[];
+  /** data_through = period_start of the latest period the insights were generated from */
+  insights: { data_through: string; items: Insight[] };
   model: string | null;
   generated_at: string;
-  /** period_start of the latest period the insights were generated from */
-  data_through: string | null;
 }
 
 /**
@@ -63,7 +62,8 @@ export async function generateAiInsights(admin: SupabaseClient): Promise<{ gener
 
       const { error: upsertErr } = await admin
         .from('ai_insights')
-        .upsert({ period, insights, model: response.model, generated_at: new Date().toISOString(), data_through: latestStart }, { onConflict: 'period' });
+        // data_through lives inside the jsonb so no schema migration is needed
+        .upsert({ period, insights: { data_through: latestStart, items: insights }, model: response.model, generated_at: new Date().toISOString() }, { onConflict: 'period' });
       if (upsertErr) throw new Error(upsertErr.message);
       generated++;
     } catch (err) {

@@ -55,5 +55,11 @@ export async function loadAiInsights(period: Period): Promise<{ insights: unknow
     .eq('period', period)
     .maybeSingle();
   if (!data) return null;
-  return { insights: data.insights, generated_at: data.generated_at, data_through: data.data_through ?? null };
+  // Current shape: { data_through, items }. Older rows stored a bare array
+  // (no period marker, so they're treated as stale) or used a data_through column.
+  const stored = data.insights;
+  if (stored && !Array.isArray(stored) && Array.isArray(stored.items)) {
+    return { insights: stored.items, generated_at: data.generated_at, data_through: stored.data_through ?? null };
+  }
+  return { insights: Array.isArray(stored) ? stored : [], generated_at: data.generated_at, data_through: data.data_through ?? null };
 }

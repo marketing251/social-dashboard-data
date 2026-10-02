@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-import { loadKpiSnapshots, loadAiInsights } from '@/lib/kpi/load';
+import { loadKpiSnapshots, loadAiInsights, loadLatestSheetSync } from '@/lib/kpi/load';
 import { summaryMetrics, missingInLatest } from '@/lib/kpi/aggregate';
 import { generateInsights, type Insight } from '@/lib/kpi/insights';
 import { sanitizeInsights } from '@/lib/ai-insights';
@@ -10,7 +10,7 @@ import { pctChange } from '@/lib/kpi/format';
 export default async function SummaryPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
   const period = (typeof sp.period === 'string' ? sp.period : 'weekly') as Period;
-  const [{ rows }, ai] = await Promise.all([loadKpiSnapshots(period), loadAiInsights(period)]);
+  const [{ rows }, ai, sync] = await Promise.all([loadKpiSnapshots(period), loadAiInsights(period), loadLatestSheetSync()]);
   if (rows.length === 0) {
     return <div className="card p-10 text-center"><h2 className="text-xl font-bold mb-2">No data yet</h2><p className="text-text-muted text-sm">Data syncs daily from the Google Sheet at 7:00 UTC. To load it now, run the sheet-sync cron from Vercel (Settings → Cron Jobs) or <code>supabase/full-backfill.sql</code> in the Supabase SQL Editor.</p></div>;
   }
@@ -25,6 +25,15 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
   const aiGeneratedAt = aiInsights.length > 0 && ai?.generated_at
     ? new Date(ai.generated_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
     : null;
+  // Say why calculated insights are showing instead of AI ones
+  const aiFailure = sync?.status === 'partial' && sync.error_message?.includes('AI insights failed')
+    ? sync.error_message.replace('Data synced; AI insights failed: ', '')
+    : null;
+  const insightsNote = aiGeneratedAt
+    ? null
+    : aiFailure
+      ? `Calculated from the latest data. The last AI insights refresh failed: ${aiFailure.slice(0, 160)}`
+      : `Calculated from the latest data. AI insights for ${rows[rows.length - 1].period_label} will appear after the next sync (use Sync now).`;
   const trendSeries = PLATFORMS.map((p) => ({
     label: PLATFORM_META[p].label,
     color: PLATFORM_META[p].color,
@@ -47,6 +56,7 @@ export default async function SummaryPage({ searchParams }: { searchParams: Prom
       rowCount={rows.length}
       insights={insights}
       aiGeneratedAt={aiGeneratedAt}
+      insightsNote={insightsNote}
       missingPlatforms={missingInLatest(rows)}
     />
   );

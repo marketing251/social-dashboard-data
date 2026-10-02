@@ -17,11 +17,13 @@ export interface SummaryViewProps {
   rowCount: number;
   insights: Insight[];
   aiGeneratedAt: string | null;
+  /** Shown under Key Insights when they are calculated rather than AI-written */
+  insightsNote?: string | null;
   /** Platforms reported last period but not yet in the latest one */
   missingPlatforms: Platform[];
 }
 
-export function SummaryView({ metrics, engagementRate, engagementChange, trendSeries, latest, prev, rowCount, insights, aiGeneratedAt, missingPlatforms }: SummaryViewProps) {
+export function SummaryView({ metrics, engagementRate, engagementChange, trendSeries, latest, prev, rowCount, insights, aiGeneratedAt, insightsNote, missingPlatforms }: SummaryViewProps) {
   const missingLabels = missingPlatforms.map((p) => PLATFORM_META[p].label);
   return (
     <div className="space-y-8 print:space-y-5">
@@ -93,6 +95,7 @@ export function SummaryView({ metrics, engagementRate, engagementChange, trendSe
             Key Insights
             {aiGeneratedAt && <span className="ml-2 text-xs font-normal text-text-muted">AI-generated {aiGeneratedAt}</span>}
           </h2>
+          {insightsNote && <p className="text-xs text-text-muted -mt-2 mb-4 no-print">{insightsNote}</p>}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 print:grid-cols-2 print:gap-3">
             {insights.map((ins, i) => <InsightCard key={i} insight={ins} />)}
           </div>
