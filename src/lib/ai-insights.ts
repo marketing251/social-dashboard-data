@@ -28,7 +28,10 @@ export async function generateAiInsights(admin: SupabaseClient): Promise<{ gener
   if (!accounts?.length) return { generated: 0, errors: ['no accounts'] };
   const platformById = new Map(accounts.map((a) => [a.id as string, a.platform as string]));
 
-  const client = new Anthropic();
+  // An organization-level API key (not scoped to a workspace) must name the
+  // workspace on every request; a workspace-scoped key needs nothing extra.
+  const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID?.trim();
+  const client = new Anthropic(workspaceId ? { defaultHeaders: { 'anthropic-workspace-id': workspaceId } } : {});
 
   // The three periods are independent, so generate them in parallel
   const results = await Promise.all(PERIODS.map(async (period): Promise<string | null> => {
