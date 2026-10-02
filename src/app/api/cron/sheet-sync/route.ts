@@ -1,90 +1,23 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { fetchSheetKpis } from '@/lib/sheet-sync';
-import { generateAiInsights } from '@/lib/ai-insights';
+import { syncSheetToDb, refreshAiInsights } from '@/lib/run-sheet-sync';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-// Daily sync of the PropAccount Google Sheet into kpi_snapshots.
-// Upserts on (account_id, period, period_start), so re-runs are safe and
-// corrections made in the sheet propagate to the dashboard.
-// Sync outcomes are recorded in sync_logs (account_id null = sheet sync);
-// after a successful sync, AI insights are regenerated (best-effort).
+// Daily sync of the PropAccount Google Sheet into kpi_snapshots, followed by
+// AI insight regeneration. Signed-in users can trigger the same sync from the
+// dashboard header via POST /api/sync/sheet.
 export async function GET(request: Request) {
-  const started = Date.now();
   const auth = request.headers.get('authorization');
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const supabase = createAdminClient();
-  const logSync = async (status: 'success' | 'partial' | 'failed', rowsInserted: number, errorMessage?: string) => {
-    await supabase.from('sync_logs').insert({
-      platform: null,
-      account_id: null,
-      status,
-      rows_inserted: rowsInserted,
-      error_message: errorMessage ?? null,
-      duration_ms: Date.now() - started,
-      finished_at: new Date().toISOString(),
-    });
-  };
+  const result = await syncSheetToDb(supabase);
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: 500 });
 
-  let rows;
-  try {
-    rows = await fetchSheetKpis();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'unknown';
-    await logSync('failed', 0, `Sheet fetch/parse failed: ${msg}`);
-    return NextResponse.json({ error: `Sheet fetch/parse failed: ${msg}` }, { status: 502 });
-  }
-  const { data: accounts, error: accErr } = await supabase
-    .from('platform_accounts')
-    .select('id, platform')
-    .eq('active', true);
-  if (accErr || !accounts) {
-    return NextResponse.json({ error: accErr?.message ?? 'No accounts' }, { status: 500 });
-  }
-  const accountByPlatform = new Map(accounts.map((a) => [a.platform as string, a.id as string]));
-
-  const payload = rows.flatMap((r) => {
-    const account_id = accountByPlatform.get(r.platform);
-    if (!account_id) return [];
-    return [{
-      account_id,
-      period: r.period,
-      period_start: r.period_start,
-      period_end: r.period_end,
-      period_label: r.period_label,
-      followers: r.followers,
-      impressions: r.impressions,
-      views: r.views,
-      likes: r.likes,
-      shares: r.shares,
-      engagement_rate: r.engagement_rate,
-      watch_time_seconds: r.watch_time_seconds,
-      source: 'google_sheets_sync',
-    }];
-  });
-
-  const { error: upsertErr } = await supabase
-    .from('kpi_snapshots')
-    .upsert(payload, { onConflict: 'account_id,period,period_start' });
-  if (upsertErr) {
-    await logSync('failed', 0, upsertErr.message);
-    return NextResponse.json({ error: upsertErr.message, attempted: payload.length }, { status: 500 });
-  }
-  await logSync('success', payload.length);
-
-  // Regenerate AI insights from the fresh data; never fails the sync, but a
-  // failure is logged as a 'partial' run so the header sync chip shows it.
-  const ai = await generateAiInsights(supabase);
-  if (ai.errors.length > 0) {
-    await logSync('partial', payload.length, `Data synced; AI insights failed: ${ai.errors.join(' | ')}`);
-  }
-
-  const counts: Record<string, number> = {};
-  for (const p of payload) counts[p.period] = (counts[p.period] ?? 0) + 1;
-  return NextResponse.json({ synced: payload.length, byPeriod: counts, aiInsights: ai });
+  const ai = await refreshAiInsights(supabase, result.synced);
+  return NextResponse.json({ synced: result.synced, byPeriod: result.byPeriod, aiInsights: ai });
 }

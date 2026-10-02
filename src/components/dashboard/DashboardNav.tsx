@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { ThemeToggle } from './ThemeToggle';
 import { GrowthToggle } from './GrowthToggle';
 import { PrintButton } from './PrintButton';
+import { SyncNowButton } from './SyncNowButton';
 import { Logo } from './Logo';
 import type { SheetSyncStatus } from '@/lib/kpi/load';
 
@@ -86,6 +87,7 @@ export function DashboardNav({ asOf, sync = null }: { asOf?: AsOfByPeriod; sync?
 
       <div className="flex items-center gap-3 flex-wrap">
         <SyncChip sync={sync} />
+        <SyncNowButton />
         <PrintButton />
         <ThemeToggle />
         {!hideGrowth && <GrowthToggle />}
